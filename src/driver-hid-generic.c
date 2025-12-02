@@ -96,7 +96,7 @@ hidgeneric_count_buttons_from_evdev(struct ratbag_device *device)
 
 	/* Find the parent input device */
 	parent = udev_device_get_parent_with_subsystem_devtype(udev_device,
-							       "input",
+							       "hid",
 							       NULL);
 	if (!parent) {
 		log_debug(device->ratbag, "Failed to find input parent\n");
@@ -179,7 +179,7 @@ hidgeneric_test_hidraw(struct ratbag_device *device)
 {
 	/* Accept any device that has a hidraw interface.
 	 * We're a generic fallback driver, so we're not picky. */
-	return 0;
+	return true;
 }
 
 static int
@@ -187,7 +187,7 @@ hidgeneric_probe(struct ratbag_device *device)
 {
 	struct hidgeneric_data *drv_data;
 	struct ratbag_profile *profile;
-	unsigned int num_buttons;
+	int num_buttons;
 	int rc;
 
 	/* Try to open hidraw device */

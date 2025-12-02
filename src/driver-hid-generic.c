@@ -194,7 +194,8 @@ hidgeneric_probe(struct ratbag_device *device)
 	rc = ratbag_find_hidraw(device, hidgeneric_test_hidraw);
 	if (rc) {
 		log_error(device->ratbag,
-			  "hid-generic: failed to open hidraw: %s\n",
+			  "hid-generic: failed to open hidraw '%s': %s\n",
+			  udev_device_get_syspath(device->udev_device),
 			  strerror(-rc));
 		return rc;
 	}

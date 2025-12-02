@@ -1397,8 +1397,11 @@ ratbag_find_hidraw_node(struct ratbag_device *device,
 
 	hid_udev = udev_device_get_parent_with_subsystem_devtype(device->udev_device, "hid", NULL);
 
-	if (!hid_udev)
+	if (!hid_udev) {
+		log_debug(device->ratbag, "Failed to get device parent with hid subsystem for '%s'.\n",
+			udev_device_get_syspath(device->udev_device));
 		return -ENODEV;
+	}
 
 	if (use_usb_parent && device->ids.bustype == BUS_USB) {
 		/* using the parent usb_device to match siblings */

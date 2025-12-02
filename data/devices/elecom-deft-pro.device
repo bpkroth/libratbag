@@ -1,0 +1,14 @@
+# Elecom DEFT Pro Trackball (M-DPT1MRXBK)
+# 
+# Pro version of the DEFT trackball with more buttons
+# Uses kernel hid-elecom driver
+
+[Device]
+Name=Elecom DEFT Pro Trackball
+DeviceMatch=usb:056e:0131
+Driver=hid-generic
+DeviceType=mouse
+
+[Driver/hid-generic]
+# Auto-detect button count from evdev
+# Buttons=8

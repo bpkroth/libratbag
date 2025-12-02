@@ -193,3 +193,11 @@ ratbag_device_data_asus_is_wireless(const struct ratbag_device_data *data);
  */
 uint32_t
 ratbag_device_data_asus_get_quirks(const struct ratbag_device_data *data);
+
+/* HID Generic */
+
+/**
+ * @return Number of buttons, or -1 if not set
+ */
+int
+ratbag_device_data_hidgeneric_get_button_count(const struct ratbag_device_data *data);

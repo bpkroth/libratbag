@@ -63,6 +63,7 @@ enum driver {
 	SINOWEALTH_NUBWO,
 	OPENINPUT,
 	MARSGAMING,
+	HID_GENERIC,
 };
 
 struct data_hidpp20 {
@@ -109,6 +110,10 @@ struct data_asus {
 	int led_modes[ASUS_MAX_NUM_LED_MODES];
 };
 
+struct data_hid_generic {
+	int button_count;
+};
+
 struct ratbag_device_data {
 	int refcount;
 	char *name;
@@ -123,6 +128,7 @@ struct ratbag_device_data {
 		struct data_sinowealth sinowealth;
 		struct data_steelseries steelseries;
 		struct data_asus asus;
+		struct data_hid_generic hid_generic;
 	};
 };
 
@@ -472,6 +478,24 @@ init_data_asus(struct ratbag *ratbag,
 	g_clear_error(&error);
 }
 
+static void
+init_data_hid_generic(struct ratbag *ratbag,
+		      GKeyFile *keyfile,
+		      struct ratbag_device_data *data)
+{
+	const char *group = "Driver/hid-generic";
+	GError *error = NULL;
+	int num;
+
+	data->hid_generic.button_count = -1;
+
+	num = g_key_file_get_integer(keyfile, group, "Buttons", &error);
+	if (num != 0 || !error)
+		data->hid_generic.button_count = num;
+	if (error)
+		g_error_free(error);
+}
+
 static const struct driver_map {
 	enum driver map;
 	const char *driver;
@@ -494,6 +518,7 @@ static const struct driver_map {
 	{ SINOWEALTH_NUBWO, "sinowealth_nubwo", NULL},
 	{ OPENINPUT, "openinput", NULL },
 	{ MARSGAMING, "marsgaming", NULL },
+	{ HID_GENERIC, "hid-generic", init_data_hid_generic },
 };
 
 const char *
@@ -967,4 +992,14 @@ ratbag_device_data_asus_get_quirks(const struct ratbag_device_data *data)
 {
 	assert(data->drivertype == ASUS);
 	return data->asus.quirks;
+}
+
+/* HID Generic */
+
+int
+ratbag_device_data_hidgeneric_get_button_count(const struct ratbag_device_data *data)
+{
+	if (!data || data->drivertype != HID_GENERIC)
+		return -1;
+	return data->hid_generic.button_count;
 }

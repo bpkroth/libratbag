@@ -1,0 +1,25 @@
+# Elecom HUGE Trackball (M-HT1URBK, M-HT1DRBK)
+# 
+# This device uses the kernel's hid-elecom driver for button fixups
+# and the generic HID driver in libratbag for basic button remapping.
+#
+# The kernel driver fixes the report descriptor to report the correct
+# number of buttons, which we detect via evdev.
+
+[Device]
+Name=Elecom HUGE Trackball
+DeviceMatch=usb:056e:010d;usb:056e:011d
+Driver=hid-generic
+DeviceType=mouse
+
+[Driver/hid-generic]
+# Profiles - currently only single profile is supported
+# Profiles=1
+
+# Buttons - optional, will be auto-detected from evdev if not specified
+# The kernel hid-elecom driver reports 12 buttons for this device
+#Buttons=12
+
+# Note: DPI and LED configuration not currently supported
+# The device itself handles these settings and they cannot be
+# modified via software at this time.

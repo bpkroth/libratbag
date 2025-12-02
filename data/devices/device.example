@@ -52,6 +52,11 @@ Leds=1
 # DeviceIndex=1
 
 
+[Driver/hid-generic]
+# The number of buttons (optional - will auto-detect from evdev if not set)
+# Buttons=8
+
+
 [Driver/asus]
 # Number of profiles
 Profiles=3

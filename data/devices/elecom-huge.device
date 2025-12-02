@@ -15,7 +15,7 @@ DeviceType=mouse
 
 #[Driver/hid-generic]
 # Profiles - currently only single profile is supported
-# Profiles=1
+#Profiles=1
 
 # Buttons - optional, will be auto-detected from evdev if not specified
 # The kernel hid-elecom driver reports 12 buttons for this device

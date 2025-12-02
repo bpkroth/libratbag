@@ -1433,8 +1433,19 @@ ratbag_find_hidraw_node(struct ratbag_device *device,
 
 		matched = match(device);
 		rc = matched ? 0 : -ENODEV;
-		if (matched == 1)
+		if (matched == 1) {
+#ifdef RATBAG_DEV_DEBUG
+			log_debug(device->ratbag, "matched device '%s'.\n",
+				udev_device_get_syspath(device->udev_device));
+#endif
 			return rc;
+		}
+		else {
+#ifdef RATBAG_DEV_DEBUG
+			log_debug(device->ratbag, "device '%s' does not match.\n",
+				udev_device_get_syspath(device->udev_device));
+#endif
+		}
 
 skip:
 		ratbag_close_hidraw_index(device, hidraw_index);

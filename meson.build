@@ -57,6 +57,8 @@ libratbag_data_dir = join_paths(get_option('prefix'),
 				'libratbag')
 libratbag_data_dir_devel = join_paths(project_source_root, 'data', 'devices')
 config_h.set_quoted('LIBRATBAG_DATA_DIR', libratbag_data_dir)
+# FIXME:
+config_h.set('RATBAG_DEV_DEBUG', 1)
 
 # dependencies
 pkgconfig = import('pkgconfig')

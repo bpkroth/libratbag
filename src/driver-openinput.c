@@ -221,8 +221,10 @@ openinput_info_version(struct ratbag_device *device)
 	};
 
 	ret = openinput_send_report(device, &report);
-	if (ret)
+	if (ret) {
+		log_error(device->ratbag, "openinput_send_report: %s\n", strerror(-ret));
 		return ret;
+	}
 
 	drv_data->fw_major = report.data[0];
 	drv_data->fw_minor = report.data[1];
@@ -253,8 +255,10 @@ openinput_info_fw_info(struct ratbag_device *device,
 	};
 
 	ret = openinput_send_report(device, &report);
-	if (ret)
+	if (ret) {
+		log_error(device->ratbag, "openinput_send_report: %s\n", strerror(-ret));
 		return ret;
+	}
 
 	memcpy(description, report.data, min(sizeof(report.data), description_size));
 
@@ -446,8 +450,10 @@ openinput_probe(struct ratbag_device *device)
 	unsigned char str[OI_REPORT_DATA_MAX_SIZE];
 
 	ret = ratbag_find_hidraw(device, openinput_test_hidraw);
-	if (ret)
+	if (ret) {
+		log_error(device->ratbag, "openinput_test_hidraw ret: %s\n", strerror(-ret));
 		return ret;
+	}
 
 	drv_data = zalloc(sizeof(*drv_data));
 
@@ -458,23 +464,31 @@ openinput_probe(struct ratbag_device *device)
 	openinput_info_version(device);
 
 	ret = openinput_info_fw_info(device, OI_FUNCTION_FW_INFO_VENDOR, str, sizeof(str));
-	if (ret)
+	if (ret) {
+		log_error(device->ratbag, "openinput: failed to get fw vendor: %s\n", strerror(-ret));
 		return ret;
+	}
 	log_info(device->ratbag, "openinput: firmware vendor: %s\n", str);
 
 	ret = openinput_info_fw_info(device, OI_FUNCTION_FW_INFO_VERSION, str, sizeof(str));
-	if (ret)
+	if (ret) {
+		log_error(device->ratbag, "openinput: failed to get firmware version: %s\n", strerror(-ret));
 		return ret;
+	}
 	log_info(device->ratbag, "openinput: firmware version: %s\n", str);
 
 	ret = openinput_info_fw_info(device, OI_FUNCTION_FW_INFO_DEVICE_NAME, str, sizeof(str));
-	if (ret)
+	if (ret) {
+		log_error(device->ratbag, "openinput: failed to get firmware device name: %s\n", strerror(-ret));
 		return ret;
+	}
 	log_info(device->ratbag, "openinput: device: %s\n", str);
 
 	ret = openinput_read_supported_function_pages(device);
-	if (ret)
+	if (ret) {
+		log_error(device->ratbag, "openinput_read_supported_function_pages ret: %s\n", strerror(-ret));
 		return ret;
+	}
 
 	ratbag_device_init_profiles(device,
 				    drv_data->num_profiles,

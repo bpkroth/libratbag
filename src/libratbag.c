@@ -351,6 +351,7 @@ ratbag_try_driver(struct ratbag_device *device,
 		rc = device->driver->probe(device);
 	if (rc == 0) {
 		if (!ratbag_sanity_check_device(device)) {
+			log_error(device->ratbag, "driver sanity check failed: %s\n", strerror(-rc));
 			goto error;
 		} else {
 			log_debug(ratbag,

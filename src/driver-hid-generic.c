@@ -46,6 +46,8 @@
  * - Devices where we only want basic button visibility/remapping
  */
 
+#define HID_GENERIC_REPORT_RATE_DEFAULT 1000
+
 struct hidgeneric_data {
 	unsigned int num_profiles;
 	unsigned int num_buttons;
@@ -70,10 +72,15 @@ static void
 hidgeneric_read_profile(struct ratbag_profile *profile)
 {
 	struct ratbag_button *button;
+	static const unsigned int report_rate = HID_GENERIC_REPORT_RATE_DEFAULT;
 
 	/* This is the only active profile */
 	profile->is_active = true;
 	profile->is_enabled = true;
+
+	/* Set a fixed report rate (read-only, not written back to device) */
+	ratbag_profile_set_report_rate_list(profile, &report_rate, 1);
+	profile->hz = report_rate;
 
 	/* Read all buttons */
 	ratbag_profile_for_each_button(profile, button)

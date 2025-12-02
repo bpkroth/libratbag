@@ -243,7 +243,7 @@ ratbag_sanity_check_device(struct ratbag_device *device)
 	struct ratbag_profile *profile = NULL;
 	bool has_active = false;
 	unsigned int nres;
-	bool rc = false;
+	bool rc = RATBAG_ERROR_VALUE;
 
 	/* arbitrary number: max 16 profiles, does any mouse have more? but
 	 * since we have num_profiles unsigned, it also checks for
@@ -316,7 +316,7 @@ ratbag_sanity_check_device(struct ratbag_device *device)
 		goto out;
 	}
 
-	rc = true;
+	rc = RATBAG_SUCCESS;
 
 out:
 	return rc;
@@ -350,8 +350,9 @@ ratbag_try_driver(struct ratbag_device *device,
 	else
 		rc = device->driver->probe(device);
 	if (rc == 0) {
-		if (!ratbag_sanity_check_device(device)) {
-			log_error(device->ratbag, "driver sanity check failed: %s\n", strerror(-rc));
+		rc = ratbag_sanity_check_device(device);
+		if (rc != 0) {
+			log_error(device->ratbag, "driver sanity check failed: %d\n", -rc);
 			goto error;
 		} else {
 			log_debug(ratbag,

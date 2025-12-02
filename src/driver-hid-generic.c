@@ -36,11 +36,11 @@
  *
  * This driver is designed for devices where:
  * - Button remapping is handled by the kernel HID driver
- * - No special DPI or LED configuration is needed initially
+ * - No special DPI or LED configuration is needed initially (could be added later with a vendor specific driver)
  * - The device uses standard HID reports
  * - Button count can be read from HID report descriptor or overridden in .device file
  *
- * Typical use cases:
+ * Initial use cases:
  * - Elecom mice/trackballs (with kernel hid-elecom driver)
  * - Simple gaming mice that don't need advanced features
  * - Devices where we only want basic button visibility/remapping
@@ -51,6 +51,9 @@
 struct hidgeneric_data {
 	unsigned int num_profiles;
 	unsigned int num_buttons;
+	// FIXME: currently unused, but could be useful for certain devices
+	bool has_wheel;        /* Device has vertical scroll wheel */
+	bool has_hwheel;       /* Device has horizontal scroll (tilt wheel) */
 };
 
 static void
@@ -59,13 +62,17 @@ hidgeneric_read_button(struct ratbag_button *button)
 	/* Enable basic button action types.
 	 * Actual button mapping is handled by the kernel, we just
 	 * provide visibility and allow remapping through evdev. */
+	ratbag_button_enable_action_type(button, RATBAG_BUTTON_ACTION_TYPE_NONE);
 	ratbag_button_enable_action_type(button, RATBAG_BUTTON_ACTION_TYPE_BUTTON);
 	ratbag_button_enable_action_type(button, RATBAG_BUTTON_ACTION_TYPE_KEY);
 	ratbag_button_enable_action_type(button, RATBAG_BUTTON_ACTION_TYPE_SPECIAL);
+	ratbag_button_enable_action_type(button, RATBAG_BUTTON_ACTION_TYPE_MACRO);
 
 	/* Set default action: button N -> button N */
 	button->action.type = RATBAG_BUTTON_ACTION_TYPE_BUTTON;
-	button->action.action.button = button->index + 1;
+	
+	// Leave the button action as 0 initialized (no action) for passthru.
+	//button->action.action.button = button->index + 1;
 }
 
 static void
@@ -181,6 +188,105 @@ hidgeneric_count_buttons_from_evdev(struct ratbag_device *device)
 	return num_buttons;
 }
 
+static void
+hidgeneric_detect_wheel_from_evdev(struct ratbag_device *device,
+				   bool *has_wheel,
+				   bool *has_hwheel)
+{
+	struct udev *udev = device->ratbag->udev;
+	struct udev_device *udev_device = device->udev_device;
+	struct udev_device *parent;
+	struct udev_enumerate *enumerate;
+	struct udev_list_entry *devices, *dev_list_entry;
+	struct libevdev *evdev = NULL;
+	const char *syspath;
+	int fd = -1;
+	int rc;
+
+	*has_wheel = false;
+	*has_hwheel = false;
+
+	/* Find the parent input device */
+	parent = udev_device_get_parent_with_subsystem_devtype(udev_device,
+							       "hid",
+							       NULL);
+	if (!parent) {
+		log_debug(device->ratbag, "Failed to find input parent\n");
+		return;
+	}
+
+	syspath = udev_device_get_syspath(parent);
+	if (!syspath) {
+		log_debug(device->ratbag, "Failed to get parent syspath\n");
+		return;
+	}
+
+	/* Enumerate event devices under this input device */
+	enumerate = udev_enumerate_new(udev);
+	if (!enumerate)
+		return;
+
+	udev_enumerate_add_match_parent(enumerate, parent);
+	udev_enumerate_add_match_subsystem(enumerate, "input");
+	udev_enumerate_scan_devices(enumerate);
+
+	devices = udev_enumerate_get_list_entry(enumerate);
+	udev_list_entry_foreach(dev_list_entry, devices) {
+		struct udev_device *dev;
+		const char *devnode;
+		const char *devpath = udev_list_entry_get_name(dev_list_entry);
+
+		dev = udev_device_new_from_syspath(udev, devpath);
+		if (!dev)
+			continue;
+
+		devnode = udev_device_get_devnode(dev);
+		if (!devnode || strstr(devnode, "/event") == NULL) {
+			udev_device_unref(dev);
+			continue;
+		}
+
+		/* Try to open the event device and check for wheel axes */
+		fd = open(devnode, O_RDONLY | O_NONBLOCK);
+		if (fd < 0) {
+			udev_device_unref(dev);
+			continue;
+		}
+
+		rc = libevdev_new_from_fd(fd, &evdev);
+		if (rc < 0) {
+			close(fd);
+			udev_device_unref(dev);
+			continue;
+		}
+
+		/* Check for vertical wheel (REL_WHEEL) */
+		if (libevdev_has_event_code(evdev, EV_REL, REL_WHEEL))
+			*has_wheel = true;
+
+		/* Check for horizontal wheel/tilt (REL_HWHEEL) */
+		if (libevdev_has_event_code(evdev, EV_REL, REL_HWHEEL))
+			*has_hwheel = true;
+
+		libevdev_free(evdev);
+		close(fd);
+		udev_device_unref(dev);
+
+		/* We found an event device, use it */
+		if (*has_wheel || *has_hwheel)
+			break;
+	}
+
+	udev_enumerate_unref(enumerate);
+
+	if (*has_wheel || *has_hwheel) {
+		log_debug(device->ratbag,
+			  "Detected wheel support: vertical=%s horizontal=%s\n",
+			  *has_wheel ? "yes" : "no",
+			  *has_hwheel ? "yes" : "no");
+	}
+}
+
 static int
 hidgeneric_test_hidraw(struct ratbag_device *device)
 {
@@ -235,6 +341,11 @@ hidgeneric_probe(struct ratbag_device *device)
 		drv_data->num_buttons = num_buttons;
 	}
 
+	/* Detect wheel support from evdev */
+	hidgeneric_detect_wheel_from_evdev(device,
+					   &drv_data->has_wheel,
+					   &drv_data->has_hwheel);
+
 	ratbag_set_drv_data(device, drv_data);
 
 	/* Initialize device with single profile, no resolutions, and detected buttons */
@@ -249,9 +360,115 @@ hidgeneric_probe(struct ratbag_device *device)
 		hidgeneric_read_profile(profile);
 
 	log_info(device->ratbag,
-		 "hid-generic: initialized device '%s' with %d buttons\n",
+		 "hid-generic: initialized %s device '%s' with %d buttons, wheel=%s, hwheel=%s\n",
+		 device->devicetype == TYPE_MOUSE ? "mouse" : device->devicetype == TYPE_KEYBOARD ? "keyboard" : "other",
 		 ratbag_device_get_name(device),
-		 drv_data->num_buttons);
+		 drv_data->num_buttons,
+		 drv_data->has_wheel ? "yes" : "no",
+		 drv_data->has_hwheel ? "yes" : "no");
+
+	return 0;
+}
+
+static int
+hidgeneric_write_button(struct ratbag_button *button)
+{
+	struct ratbag_device *device = button->profile->device;
+	struct ratbag_button_action *action = &button->action;
+
+	log_debug(device->ratbag,
+		  "hid-generic: writing button %d action type %d\n",
+		  button->index,
+		  action->type);
+
+	/* For now, we just accept the action without writing anything to the device.
+	 * The actual button remapping is handled by the kernel driver (e.g., hid-elecom).
+	 * In the future, we may need to send HID reports for devices that support
+	 * hardware remapping. */
+
+	return 0;
+}
+
+static int
+hidgeneric_write_profile(struct ratbag_profile *profile)
+{
+	struct ratbag_device *device = profile->device;
+	struct ratbag_button *button;
+	struct ratbag_resolution *resolution;
+	struct ratbag_led *led;
+	int rc;
+
+	/* Check for unsupported features and log warnings */
+	if (profile->rate_dirty) {
+		log_info(device->ratbag,
+			    "hid-generic: report rate changes not supported, ignoring\n");
+		profile->rate_dirty = false;
+	}
+
+	ratbag_profile_for_each_resolution(profile, resolution) {
+		if (!resolution->dirty)
+			continue;
+
+		log_info(device->ratbag,
+			    "hid-generic: DPI/resolution changes not supported, ignoring\n");
+		resolution->dirty = false;
+	}
+
+	ratbag_profile_for_each_led(profile, led) {
+		if (!led->dirty)
+			continue;
+
+		log_info(device->ratbag,
+			    "hid-generic: LED changes not supported, ignoring\n");
+		led->dirty = false;
+	}
+
+	/* Handle button remapping */
+	ratbag_profile_for_each_button(profile, button) {
+		if (!button->dirty)
+			continue;
+
+		log_debug(device->ratbag,
+			  "hid-generic: button %d changed, rewriting\n",
+			  button->index);
+
+		rc = hidgeneric_write_button(button);
+		if (rc != 0) {
+			log_error(device->ratbag,
+				  "Failed to write button %d: %s (%d)\n",
+				  button->index,
+				  strerror(-rc),
+				  rc);
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+static int
+hidgeneric_commit(struct ratbag_device *device)
+{
+	struct ratbag_profile *profile;
+	int rc = 0;
+
+	list_for_each(profile, &device->profiles, link) {
+		if (!profile->dirty)
+			continue;
+
+		log_debug(device->ratbag,
+			  "hid-generic: profile %d changed, rewriting\n",
+			  profile->index);
+
+		rc = hidgeneric_write_profile(profile);
+		if (rc) {
+			log_error(device->ratbag,
+				  "Failed to write profile: %s (%d)\n",
+				  strerror(-rc),
+				  rc);
+			return rc;
+		}
+	}
 
 	return 0;
 }
@@ -268,5 +485,5 @@ struct ratbag_driver hidgeneric_driver = {
 	.id = "hid-generic",
 	.probe = hidgeneric_probe,
 	.remove = hidgeneric_remove,
-	.commit = NULL, /* No commit support - read-only for now */
+	.commit = hidgeneric_commit,
 };

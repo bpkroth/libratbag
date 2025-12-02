@@ -1,5 +1,6 @@
 # Elecom HUGE Trackball (M-HT1URBK, M-HT1DRBK)
-# 
+# vim: set ft=dosini:
+#
 # This device uses the kernel's hid-elecom driver for button fixups
 # and the generic HID driver in libratbag for basic button remapping.
 #
@@ -8,11 +9,11 @@
 
 [Device]
 Name=Elecom HUGE Trackball
-DeviceMatch=usb:056e:010d;usb:056e:011d
+DeviceMatch=usb:056e:010d;usb:056e:011c
 Driver=hid-generic
 DeviceType=mouse
 
-[Driver/hid-generic]
+#[Driver/hid-generic]
 # Profiles - currently only single profile is supported
 # Profiles=1
 
